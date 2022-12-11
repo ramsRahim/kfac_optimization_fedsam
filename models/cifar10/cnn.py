@@ -31,7 +31,7 @@ class ClientModel(nn.Module):
             nn.ReLU(),
             nn.Linear(384, 192),
             nn.ReLU(),
-            nn.Linear(192, self.num_classes)
+            nn.Linear(192, self.num_classes, bias=False)
         )
 
         self.size = self.model_size()
@@ -42,7 +42,18 @@ class ClientModel(nn.Module):
         x = self.layer2(x)
         x = torch.reshape(x, (x.shape[0], -1))
         x = self.classifier(x)
+        #x = Variable(x.data, requires_grad=True)
         return x
+
+    """ def backward(self, g):
+        for i, output in reversed(list(enumerate(self.output))):
+            if i == (len(self.output) - 1):
+                # for last node, use g
+                output.backward(g)
+            else:
+                output.backward(self.input[i+1].grad.data)
+                print(i, self.input[i+1].grad.data.sum())
+                 """
 
     def model_size(self):
         tot_size = 0

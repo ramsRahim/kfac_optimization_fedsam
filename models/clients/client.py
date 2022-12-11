@@ -48,6 +48,15 @@ class Client:
         """
         # Train model
         criterion = nn.CrossEntropyLoss().to(self.device)
+        # last layer -> required grad false
+        for i,param in enumerate(self.model.parameters()):
+            if i == len(list(self.model.parameters()))-1:
+                param.requires_grad = False
+
+        #for testing
+        """ for param in self.model.parameters():
+            print(param.requires_grad,param.shape) """ 
+
         optimizer = optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay, momentum=self.momentum)
         losses = np.empty(num_epochs)
 
@@ -71,13 +80,44 @@ class Client:
         running_loss = 0.0
         i = 0
         for j, data in enumerate(self.trainloader):
+            model2 = copy.deepcopy(self.model) #copying the model just to train the last layer
             input_data_tensor, target_data_tensor = data[0].to(self.device), data[1].to(self.device)
             optimizer.zero_grad()
             outputs = self.model(input_data_tensor)
             loss = criterion(outputs, target_data_tensor)
             loss.backward()  # gradient inside the optimizer (memory usage increases here)
             running_loss += loss.item()
+            for i,param in enumerate(self.model.parameters()):
+                if i == len(list(self.model.parameters()))-1:
+                    y1 = param.detach_()
+
             optimizer.step()  # update of weights
+
+            # for testing
+            """ for i,param in enumerate(self.model.parameters()):
+                if i == len(list(self.model.parameters()))-1:
+                    print(abs(y1-param).mean())
+             """
+            for i,param in enumerate(model2.parameters()):
+                if i == len(list(model2.parameters()))-1:
+                    param.requires_grad = True
+
+            #traiining the clone model to get the gradient of the last layer
+            optimizer.zero_grad()
+            outputs = model2(input_data_tensor)
+            loss = criterion(outputs, target_data_tensor)
+            loss.backward()
+            optimizer.step()
+
+            for i,param in enumerate(model2.parameters()):
+                if i == len(list(model2.parameters()))-1:
+                    lastLayer_grad = param.grad.detach_()
+
+            #updating the last layers weight
+            for i,param in enumerate(self.model.parameters()):
+                if i == len(list(self.model.parameters()))-1:
+                    param -= self.lr*lastLayer_grad
+                    #last layer param = param - lr*param.grad
             i += 1
         if i == 0:
             print("Not running epoch", self.id)
